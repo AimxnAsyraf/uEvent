@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16, React 19, TypeScript, Tailwind CSS 4, Supabase (Postgres, Auth, Storage) with `@supabase/supabase-js` 2 and `@supabase/ssr`, Zod 4, Resend for email, Vitest 5, Playwright. Hosting: Vercel and a Supabase cloud project.
 
-**Spec:** `docs/superpowers/specs/2026-11-12-uevent-design.md`
+**Spec:** `docs/design-spec.md`
 
 ## Milestones
 
