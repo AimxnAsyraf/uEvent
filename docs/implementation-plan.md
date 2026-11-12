@@ -6,7 +6,7 @@
 
 **Architecture:** A single Next.js App Router application. Business rules live as pure TypeScript functions in `src/domain/` and are unit-tested. Every write goes through a server action in `src/features/<area>/actions.ts`, which authorises the caller with the domain functions and then writes with the Supabase service-role client. Row Level Security allows reads only, as a second line of defence; anonymous visitors can read only the `public_events` view.
 
-**Tech Stack:** Next.js 16, React 19, TypeScript, Tailwind CSS 4, Supabase (Postgres, Auth, Storage) with `@supabase/supabase-js` 2 and `@supabase/ssr`, Zod 4, Resend for email, Vitest 5, Playwright. Hosting: Vercel and a Supabase cloud project.
+**Tech Stack:** Next.js 16, React 19, TypeScript, Tailwind CSS 4, Supabase (Postgres, Auth, Storage) with `@supabase/supabase-js` 2 and `@supabase/ssr`, Zod 4, Resend for email, Vitest 5, Playwright. Hosting: Netlify for the app (deploy previews on every pull request), and two Supabase cloud projects in Singapore: staging for previews, production for the live site. Scheduled jobs run as GitHub Actions workflows.
 
 **Spec:** `docs/design-spec.md`
 
@@ -14,11 +14,11 @@
 
 | Milestone | Tasks | Outcome |
 |---|---|---|
-| M1: SRC demo | 1 to 9 | A club drafts and submits a proposal; the SRC approves, returns or rejects it. |
+| M1: SRC demo | 1 to 9, and 2B | A club drafts and submits a proposal; the SRC approves, returns or rejects it, on a shareable Netlify preview link. |
 | M2: Complete v1 | 10 to 14 | Letter verification, public page, change requests, reports, SRC overview. |
 | M3: Pilot ready | 15 | Deployed, with real sign-in, ready for 3 to 5 pilot clubs. |
 
-With 3 to 4 developers: Tasks 1 and 2 are done first by the whole team. After that, Tasks 3 and 4 (domain), 5 and 6 (accounts) and 8 (notifications) can run in parallel. Tasks 10 to 14 can run in parallel once Task 9 is merged.
+With 3 to 4 developers: Tasks 1 and 2 are done first by the whole team, and Task 2B (preview hosting) straight after. After that, Tasks 3 and 4 (domain), 5 and 6 (accounts) and 8 (notifications) can run in parallel. Tasks 10 to 14 can run in parallel once Task 9 is merged.
 
 ## Global Constraints
 
@@ -33,6 +33,7 @@ With 3 to 4 developers: Tasks 1 and 2 are done first by the whole team. After th
 - Uploads: at most 10 MB each. Documents: PDF, DOCX, JPG, PNG. Posters: JPG, PNG.
 - Defaults: notice period 3 days, report due 14 days after the event ends. Both are read from the `settings` table.
 - Commit after every task with a Conventional Commits message.
+- Hosting is Netlify. Nothing in the app may depend on a host-specific feature; scheduled work runs from GitHub Actions and calls an app route.
 
 ## Review Focus
 
@@ -76,6 +77,10 @@ src/
     login/page.tsx, auth/callback/route.ts
     club/[clubId]/...               club organiser screens
     src/...                         SRC admin screens
+netlify.toml                        build command and Node version
+.github/workflows/
+  ci.yml                            lint, typecheck, unit and integration tests
+  report-reminders.yml              daily call to the reminder route (Task 13)
 tests/
   unit/                             Vitest, no database
   integration/                      Vitest against local Supabase
@@ -213,6 +218,48 @@ Unit tests mirror `src/domain` and `src/lib`. Integration tests are one file per
 - [ ] **Step 4: Write `supabase/seed.sql`** (settings rows), `src/lib/supabase/admin.ts`, `tests/integration/helpers.ts`. Generate types with `npx supabase gen types typescript --local > src/lib/database.types.ts`.
 - [ ] **Step 5: Run** `npm run db:reset && npm run test:int`. Expected: PASS.
 - [ ] **Step 6: Commit** `feat: add database schema with read-only row level security`.
+
+---
+
+### Task 2B: Preview hosting on Netlify
+
+Do this straight after Task 2. Every later pull request then gets a preview link that teammates and the SRC contact can open on a phone.
+
+**Files:**
+- Create: `netlify.toml`, `.nvmrc`, `docs/deployment.md`
+- Modify: `README.md` (link to `docs/deployment.md`), `.github/pull_request_template.md` (preview checkbox)
+
+**Interfaces:**
+- Consumes: the build from Task 1; the migration from Task 2.
+- Produces: a Netlify site linked to the GitHub repository, a staging Supabase project, and a deploy preview for every pull request.
+
+**Decisions:**
+- One staging Supabase project in the Singapore region is shared by every deploy preview. Production gets its own project in Task 15. Never point a preview at production.
+- Netlify detects Next.js and applies its Next.js adapter itself. `netlify.toml` sets only the build command and the Node version:
+
+  ```toml
+  [build]
+    command = "npm run build"
+
+  [build.environment]
+    NODE_VERSION = "22"
+  ```
+- `.nvmrc` contains `22`.
+- Netlify environment variables are set per deploy context. "Deploy Previews" and "Branch deploys" use the staging values from `.env.example`; "Production" is left empty until Task 15. `NEXT_PUBLIC_AUTH_MODE=password` on staging. `SUPABASE_SERVICE_ROLE_KEY` is marked secret.
+- Staging Supabase Auth: Site URL is the Netlify site's main URL; Additional Redirect URLs are `http://localhost:3000/**` and `https://**--<netlify-site-name>.netlify.app/**`, so every preview can complete sign-in.
+- Migrations reach staging by hand: after a pull request with a migration merges, the Lead runs `npx supabase link --project-ref <staging-ref>` once, then `npx supabase db push`. Previews of an unmerged migration therefore run against the old schema; the author says so in the pull request.
+
+- [ ] **Step 1: Create the staging Supabase project** (Singapore region), then link it and push the schema:
+
+  Run: `npx supabase link --project-ref <staging-ref> && npx supabase db push`
+  Expected: `0001_schema.sql` applied; the `attachments` and `posters` buckets appear in the dashboard.
+- [ ] **Step 2: Write `netlify.toml` and `.nvmrc`** as above. Run `npm run build`. Expected: build succeeds.
+- [ ] **Step 3: Create the Netlify site** from the GitHub repository, production branch `main`, and set the deploy-context environment variables above. Turn on Deploy Previews for pull requests.
+- [ ] **Step 4: Set the staging Auth URLs** in the Supabase dashboard as above.
+- [ ] **Step 5: Verify the preview.** Open a pull request with this task's changes.
+  Expected: Netlify posts a deploy preview link on the pull request; the link shows "Upcoming events" on a phone and on a laptop.
+- [ ] **Step 6: Write `docs/deployment.md`** with a "Previews" section: the two Supabase projects and what each is for, where each environment variable is set, the redirect URL rule, and the manual migration step. Task 15 adds the production section. Add a "Deploy preview checked" line to the pull request template.
+- [ ] **Step 7: Commit** `chore: add Netlify preview hosting`.
 
 ---
 
@@ -781,7 +828,7 @@ Unit tests mirror `src/domain` and `src/lib`. Integration tests are one file per
 
 **Files:**
 - Create: `src/features/reports/actions.ts`, `src/features/reports/queries.ts`, `src/features/reports/reminders.ts`
-- Create: `src/app/club/[clubId]/events/[eventId]/report/page.tsx`, `src/app/api/cron/report-reminders/route.ts`, `vercel.json`
+- Create: `src/app/club/[clubId]/events/[eventId]/report/page.tsx`, `src/app/api/cron/report-reminders/route.ts`, `.github/workflows/report-reminders.yml`
 - Create: `supabase/migrations/0003_report_reminders.sql` (table `report_reminders`: `event_id`, `kind` (`due_soon`, `overdue`), `sent_at`, pk (`event_id`, `kind`))
 - Test: `tests/integration/reports.test.ts`
 
@@ -803,7 +850,8 @@ Unit tests mirror `src/domain` and `src/lib`. Integration tests are one file per
 - `submitReport`: any club member; the event must be `approved` and ended (code `event_not_ended`); one report per event (code `already_reported`); `summary` 1 to 5000 characters; attendance an integer ≥ 0; spending ≥ 0. Filing a report unblocks the club with no other action. It writes a history row with action `report_submitted` and notifies `src_admins`.
 - `reportStatus`: `not_due` before the event ends or when the status is not `approved`; `due` from the end until the deadline; `overdue` after it; `filed` when a report exists.
 - `sendReportReminders` notifies the club once when a report is due within 3 days (`due_soon`) and once when it becomes overdue (`overdue`), recording each in `report_reminders` so a second run sends nothing.
-- The cron route requires the header `Authorization: Bearer ${CRON_SECRET}` and returns 401 otherwise. `vercel.json` schedules it daily at `0 1 * * *` (9:00 AM Malaysia time). Add `CRON_SECRET` to `.env.example`.
+- The route accepts `POST` only, requires the header `Authorization: Bearer ${CRON_SECRET}`, returns 401 otherwise, and returns the counts from `sendReportReminders` as JSON. Add `CRON_SECRET` to `.env.example` and to Netlify's environment variables.
+- `.github/workflows/report-reminders.yml` runs on `schedule: cron: '0 1 * * *'` (9:00 AM Malaysia time) and on `workflow_dispatch`, and runs `curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" "$SITE_URL/api/cron/report-reminders"` with `CRON_SECRET` from repository secrets and `SITE_URL` from repository variables. GitHub runs scheduled workflows from the default branch only and may start them late; both are fine because the job is daily and sending is idempotent.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -819,6 +867,7 @@ Unit tests mirror `src/domain` and `src/lib`. Integration tests are one file per
     expect(await sendReportReminders(fifteenDaysAfterEnd)).toEqual({ dueSoon: 0, overdue: 1 });
   });
   test('the cron route refuses a request without the secret', async () => { /* 401 */ });
+  test('the cron route refuses GET', async () => { /* 405 */ });
   ```
 - [ ] **Step 2: Run** `npm run test:int -- reports`. Expected: FAIL.
 - [ ] **Step 3: Implement** the migration, actions, queries, reminders, route and page. Show `reportStatus` and the due date on the club's event list and event page.
@@ -881,8 +930,8 @@ Unit tests mirror `src/domain` and `src/lib`. Integration tests are one file per
 ### Task 15: Deployment and pilot readiness (M3)
 
 **Files:**
-- Create: `docs/deployment.md`, `docs/pilot-guide.md`, `tests/e2e/full-flow.spec.ts`
-- Modify: `README.md`
+- Create: `docs/pilot-guide.md`, `tests/e2e/full-flow.spec.ts`
+- Modify: `README.md`, `docs/deployment.md` (from Task 2B)
 
 **Interfaces:**
 - Consumes: everything above.
@@ -890,9 +939,9 @@ Unit tests mirror `src/domain` and `src/lib`. Integration tests are one file per
 
 - [ ] **Step 1: Write the full e2e test** `tests/e2e/full-flow.spec.ts`: create club → draft → submit → approve → upload letter → verify → event visible on `/` → change request for venue approved → set the event's end 15 days in the past through the admin client → club is blocked → file the report → club can submit again.
 - [ ] **Step 2: Run** `npm run test:e2e -- --trace off`. Expected: PASS.
-- [ ] **Step 3: Create the production services.** A Supabase project in the Singapore region; apply migrations with `npx supabase db push`; create the `attachments` and `posters` buckets; a Vercel project linked to the repository with every variable from `.env.example`; a Resend account with a verified sending domain.
+- [ ] **Step 3: Create the production services.** A second Supabase project in the Singapore region; link it and apply migrations with `npx supabase db push` (the buckets come from the migration). In the Netlify site from Task 2B, fill the "Production" deploy context with the production values of every variable in `.env.example`. A Resend account with a verified sending domain. Production Supabase Auth: Site URL is the production address; Additional Redirect URLs list only that address's exact callback path, with no wildcard. In GitHub, set the `CRON_SECRET` secret and the `SITE_URL` variable for Task 13's workflow, then run it once with `workflow_dispatch`.
 - [ ] **Step 4: Set up Microsoft sign-in.** Register an application in Microsoft Entra ID as a single-tenant app for the university tenant, with redirect URI `https://<project-ref>.supabase.co/auth/v1/callback`, and enter its client ID, secret and tenant URL in the Supabase Azure provider. This needs university IT to register the app or grant consent. If that is not possible by pilot start, deploy with `NEXT_PUBLIC_AUTH_MODE=password`.
-- [ ] **Step 5: Write `docs/deployment.md`:** the services, every environment variable and where its value comes from, how to apply a migration, how to add the first SRC admin (`SRC_ADMIN_EMAILS`), how to switch sign-in mode, and how to restore from a Supabase backup.
+- [ ] **Step 5: Add a "Production" section to `docs/deployment.md`:** the production services, every production environment variable and where its value comes from, how to apply a migration to production, how to add the first SRC admin (`SRC_ADMIN_EMAILS`), how to switch sign-in mode, how to roll back a bad deploy in Netlify, and how to restore from a Supabase backup.
 - [ ] **Step 6: Write `docs/pilot-guide.md`:** two one-page guides, one for SRC admins and one for club presidents, each walking through their screens in order.
 - [ ] **Step 7: Verify in production:** sign in as the first SRC admin, create a test club, run one proposal through to the public page from a phone, then delete the test club's data through the Supabase dashboard.
 - [ ] **Step 8: Commit** `docs: add deployment and pilot guides`.
@@ -912,5 +961,5 @@ Unit tests mirror `src/domain` and `src/lib`. Integration tests are one file per
 | 8 Public page | 2, 11 |
 | 9 SRC overview | 9, 10, 12, 14 |
 | 10 Notifications | 8, 9, 10, 12, 13 |
-| 11 Technology | 1, 15 |
+| 11 Technology | 1, 2B, 15 |
 | 13 Rollout | M1 checkpoint after 9; 15 |
