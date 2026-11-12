@@ -28,7 +28,7 @@ Read this with:
 
 | Phase | Lead | Dev B | Dev C | Dev D |
 |---|---|---|---|---|
-| 0. Foundation | Task 1 (scaffold), Task 2 (database) | Set up, read the spec and plan | Same | Same |
+| 0. Foundation | Task 1 (scaffold), Task 2 (database), Task 2B (Netlify previews) | Set up, read the spec and plan | Same | Same |
 | 1. Towards the SRC demo | Task 5 (sign-in), then Task 9 (submission and review) | Task 3 (status rules), Task 4 (timing rules), then Task 7 (drafting and uploads) | Task 8 (notifications), then Task 6 (clubs) | Task 11 (public page), then Task 14 (SRC overview) |
 | 2. Complete first version | Task 12 (change requests) | Task 10 (Student Affairs letter) | Task 13 (reports and reminders) | Finish Task 14, then the full-flow test (Task 15, Steps 1 and 2) |
 | 3. Pilot | Task 15 (deployment, Microsoft sign-in) | Pilot guide for clubs | Pilot guide for the SRC | Production check on a phone, pilot support |
@@ -47,6 +47,7 @@ A task can start only when the tasks it waits for are merged into `main`.
 |---|---|
 | 1 Scaffold | nothing |
 | 2 Database | 1 |
+| 2B Netlify previews | 2 |
 | 3 Status rules | 1 |
 | 4 Timing rules | 2, 3 |
 | 5 Sign-in | 2, 3 |
@@ -67,8 +68,8 @@ The critical path to the demo is 1 → 2 → 5 → 7 → 9. If any of those slip
 
 | Checkpoint | When | What happens |
 |---|---|---|
-| Foundation ready | Tasks 1 and 2 merged | Everyone runs the app and the tests locally before taking a task. |
-| SRC demo | Task 9 merged | Demo the flow to the SRC contact. Record their feedback as cards before Phase 2. |
+| Foundation ready | Tasks 1, 2 and 2B merged | Everyone runs the app and the tests locally before taking a task. Every pull request now gets a Netlify preview link. |
+| SRC demo | Task 9 merged | Demo the flow to the SRC contact on the staging site, so they can try it on their own phone. Record their feedback as cards before Phase 2. |
 | Feature complete | Tasks 10 to 14 merged | The full-flow test passes. |
 | Pilot start | Task 15 done | 3 to 5 clubs start using it. |
 
@@ -76,7 +77,7 @@ There are no dates, because there is no deadline. Set a target date for the SRC 
 
 ## 3. Task board (Notion)
 
-One card per plan task, 15 cards to start.
+One card per plan task, 16 cards to start (Tasks 1 to 15 plus Task 2B).
 
 Columns:
 
@@ -108,7 +109,7 @@ Rules:
 2. Update `main`, then create a branch named `task-<number>-<short-name>`, for example `task-07-drafting`.
 3. Follow the task's steps in order. Write the test first, watch it fail, then write the code.
 4. Push at least once per working session, even if unfinished. Open a draft pull request on the first push.
-5. When the task's tests pass, click through the feature yourself in the browser.
+5. When the task's tests pass, click through the feature yourself in the browser, locally and on the Netlify deploy preview link that Netlify posts on the pull request.
 6. Mark the pull request ready, move the card to In review, and post the link in the team chat.
 7. After approval, squash and merge, delete the branch, and move the card to Done.
 
@@ -116,7 +117,7 @@ Rules:
 
 - Every step of the plan task is ticked.
 - `npm run lint`, `npm run typecheck`, `npm test` and `npm run test:int` pass locally, and CI is green.
-- The author has used the feature in the browser.
+- The author has used the feature in the browser, including on the deploy preview.
 - The pull request is approved.
 - No interface in the plan was changed without following section 6.
 
@@ -134,7 +135,7 @@ Rules:
 | 2 and 3 | Any developer can review. The Lead must also review anything touching sign-in, permissions, uploads or database migrations. |
 
 - Review within 2 days. If you can't, say so and someone else takes it.
-- A reviewer checks: the tests match the plan, the code does what the task says, permissions are checked on the server, and nothing outside the task changed.
+- A reviewer opens the deploy preview and tries the feature, then checks: the tests match the plan, the code does what the task says, permissions are checked on the server, and nothing outside the task changed.
 - Comments are about the code, not the person. Mark a comment "must fix" or "suggestion".
 - The author fixes "must fix" comments and replies to every comment.
 
@@ -145,6 +146,7 @@ The "Interfaces" block in each plan task lists the function names, types and tab
 - Build exactly the names and types the plan gives.
 - If one has to change, post in the team chat first, then change the plan in the same pull request as the code.
 - Database changes go in a new numbered migration file. Never edit a merged migration. Tell the team before merging a migration, because numbers can collide.
+- Deploy previews share one staging database. After a migration merges, the Lead applies it to staging (see `docs/deployment.md`). Until then, previews of that pull request run against the old schema; say so in the pull request.
 
 ## 7. Using AI assistants
 
@@ -208,6 +210,6 @@ A finished task needs no note: the merged pull request and the plan are the reco
 
 | Who | What |
 |---|---|
-| Lead | Create the Notion board with the 15 cards. Protect `main`. Complete Tasks 1 and 2. |
+| Lead | Create the Notion board with a card per task (16, including Task 2B). Protect `main`. Complete Tasks 1, 2 and 2B. |
 | Everyone else | Install Node.js 22 and Docker. Read `docs/design-spec.md` and the plan's opening sections. Once Task 2 is merged, run the app and the tests locally. |
 | All | First sync: put names in section 1, agree the chat channel and sync time, set a target date for the SRC demo. |

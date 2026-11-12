@@ -120,7 +120,7 @@ Email to the university address plus an in-app list, sent when something needs a
 
 - Responsive web app, English only.
 - Next.js and Supabase (Postgres, sign-in, file storage), TypeScript throughout.
-- Paid hosting, funded by the team or the SRC.
+- Hosting: Netlify for the app, with a preview link for every pull request; Supabase cloud in the Singapore region, with separate staging and production projects. Paid plans, funded by the team or the SRC.
 - Times shown in Malaysia time. Money in RM.
 
 ## 12. Out of scope for the first version
